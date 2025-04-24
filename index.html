@@ -39,8 +39,8 @@
     #vuBar {
       height: 100%;
       width: 0%;
-      background: linear-gradient(to right, #00ff00, #ffff00, #ff0000);
-      transition: width 0.1s ease-in-out;
+      background-color: green;
+      transition: width 0.1s ease-in-out, background-color 0.2s ease-in-out;
     }
     button {
       padding: 0.6rem 1.2rem;
@@ -132,6 +132,9 @@
 
         if (isVU) {
           vuBar.style.width = `${normalized}%`;
+          if (normalized < 33) vuBar.style.backgroundColor = 'green';
+          else if (normalized < 66) vuBar.style.backgroundColor = 'yellow';
+          else vuBar.style.backgroundColor = 'red';
         } else {
           meter.textContent = `${normalized} dB`;
           meter.style.boxShadow = `0 0 ${normalized / 2}px rgba(0,255,0,0.4)`;
@@ -145,6 +148,7 @@
       meter.textContent = '0 dB';
       meter.style.boxShadow = '0 0 30px rgba(0,255,0,0.3)';
       vuBar.style.width = '0%';
+      vuBar.style.backgroundColor = 'green';
     }
   </script></body>
 </html>
