@@ -1,51 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>shhh: Sound Meter</title>
   <style>
     body {
       margin: 0;
       padding: 0;
-      background: #111;
+      background-color: #111;
       color: #fff;
       font-family: sans-serif;
       display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    header {
-      padding: 1em;
-      font-size: 1.5em;
-      font-weight: bold;
-    }
-
-    .presets {
-      display: flex;
-      flex-wrap: wrap;
       justify-content: center;
-      gap: 0.5em;
-      padding: 0.5em;
+      align-items: center;
+      height: 100vh;
+      flex-direction: column;
     }
 
-    .presets button {
-      background: #222;
-      color: #fff;
-      border: 1px solid #555;
-      border-radius: 6px;
-      padding: 0.4em 0.8em;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .presets button.active {
-      background: #4caf50;
+    h1 {
+      margin-bottom: 40px;
+      font-size: 1.5em;
     }
 
     .circle {
-      margin-top: 2em;
       width: 200px;
       height: 200px;
       border-radius: 50%;
@@ -61,30 +39,11 @@
   </style>
 </head>
 <body>
-  <header>shhh: Sound Meter</header>
-
-  <div class="presets">
-    <button data-db="40">Quiet Office</button>
-    <button data-db="60">Conversation</button>
-    <button data-db="70">Classroom</button>
-    <button data-db="85">Hair Dryer</button>
-    <button data-db="120">Rock Concert</button>
-  </div>
-
+  <h1>shhh: Sound Meter</h1>
   <div class="circle" id="meter">-- dB</div>
 
   <script>
     const meter = document.getElementById('meter');
-    const buttons = document.querySelectorAll('.presets button');
-    let referenceDb = 60;
-
-    buttons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        buttons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        referenceDb = parseInt(btn.getAttribute('data-db'));
-      });
-    });
 
     navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
       const audioCtx = new AudioContext();
@@ -103,14 +62,14 @@
         let rms = Math.sqrt(data.reduce((a, b) => a + b * b, 0) / data.length);
         let db = 20 * Math.log10(rms / 255);
         db = Math.max(-60, db);
-        let relativeDb = Math.round(db + referenceDb);
-        meter.textContent = `${relativeDb} dB`;
+        db = Math.round(db + 60); // Make it more human-readable
+        meter.textContent = `${db} dB`;
 
         // color and glow
         let color;
-        if (relativeDb < referenceDb + 5) {
+        if (db < 55) {
           color = '#4caf50'; // green
-        } else if (relativeDb < referenceDb + 15) {
+        } else if (db < 70) {
           color = '#ffc107'; // yellow
         } else {
           color = '#f44336'; // red
