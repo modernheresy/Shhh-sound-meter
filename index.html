@@ -12,24 +12,38 @@
       justify-content: center;
       height: 100vh;
       margin: 0;
-      background: #111;
+      background: #0d0d0d;
       color: #fff;
     }
     #meter {
-      font-size: 4rem;
-      margin: 1rem;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: radial-gradient(circle at center, #2e2e2e, #1a1a1a);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      box-shadow: 0 0 30px rgba(0,255,0,0.3);
+      margin: 1.5rem;
+      transition: box-shadow 0.2s ease-in-out;
     }
     button {
-      padding: 0.5rem 1rem;
-      font-size: 1.2rem;
+      padding: 0.6rem 1.2rem;
+      font-size: 1.1rem;
       cursor: pointer;
+      background: #222;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
     }
-    label, input {
+    label {
       margin-top: 1rem;
-      font-size: 1rem;
+      font-size: 0.9rem;
     }
     input[type="range"] {
       width: 200px;
+      margin-top: 0.5rem;
     }
   </style>
 </head>
@@ -38,7 +52,8 @@
   <div id="meter">0 dB</div>
   <button id="toggle">Start</button>
   <label>
-    Sensitivity: <input type="range" id="sensitivity" min="1" max="10" value="5">
+    Sensitivity:
+    <input type="range" id="sensitivity" min="1" max="10" value="5">
   </label>  <script>
     let running = false;
     let meterInterval;
@@ -84,10 +99,11 @@
         const rms = Math.sqrt(sumSquares / bufferLength);
         let decibels = 20 * Math.log10(rms);
 
-        // Adjust for user sensitivity and normalize
         const sensitivity = parseInt(sensitivitySlider.value);
         const normalized = Math.max(0, Math.min(100, Math.round((decibels + 50) * sensitivity)));
+
         meter.textContent = `${normalized} dB`;
+        meter.style.boxShadow = `0 0 ${normalized / 2}px rgba(0,255,0,0.4)`;
       }, 100);
     }
 
@@ -95,6 +111,7 @@
       clearInterval(meterInterval);
       audioContext.close();
       meter.textContent = '0 dB';
+      meter.style.boxShadow = '0 0 30px rgba(0,255,0,0.3)';
     }
   </script></body>
 </html>
