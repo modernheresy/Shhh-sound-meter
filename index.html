@@ -1,115 +1,158 @@
-Still here! Here’s a clean version of the updated code with environment preset buttons and calibration logic:
-
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>shhh: Sound Meter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shhh! Sound Meter</title>
   <style>
     body {
       font-family: sans-serif;
-      background: #111;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background: #0d0d0d;
       color: #fff;
-      text-align: center;
-      padding: 2em;
     }
-    h1 {
-      margin-bottom: 0.5em;
+    #meter {
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: radial-gradient(circle at center, #2e2e2e, #1a1a1a);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      box-shadow: 0 0 30px rgba(0,255,0,0.3);
+      margin: 1.5rem;
+      transition: box-shadow 0.2s ease-in-out;
     }
-    .presets button {
+    #vuBarContainer {
+      width: 200px;
+      height: 30px;
       background: #222;
-      border: 1px solid #555;
-      color: #fff;
-      padding: 0.5em 1em;
-      margin: 0.3em;
+      border-radius: 15px;
+      overflow: hidden;
+      display: none;
+    }
+    #vuBar {
+      height: 100%;
+      width: 0%;
+      background-color: green;
+      transition: width 0.3s ease-in-out, background-color 0.3s ease-in-out;
+    }
+    button {
+      padding: 0.6rem 1.2rem;
+      font-size: 1.1rem;
       cursor: pointer;
+      background: #222;
+      color: #fff;
+      border: none;
       border-radius: 8px;
+      margin-top: 0.5rem;
     }
-    .presets button.active {
-      background: #4caf50;
+    label {
+      margin-top: 1rem;
+      font-size: 0.9rem;
     }
-    .meter {
-      margin-top: 2em;
-      font-size: 3em;
-      font-weight: bold;
-      transition: color 0.2s;
+    input[type="range"] {
+      width: 200px;
+      margin-top: 0.5rem;
     }
   </style>
 </head>
 <body>
-  <h1>shhh: Sound Meter</h1>
+  <h1>Shhh! Sound Meter</h1>
+  <div id="meter">0 dB</div>
+  <div id="vuBarContainer"><div id="vuBar"></div></div>
+  <button id="toggle">Start</button>
+  <button id="viewToggle">Switch to VU Meter</button>
+  <label>
+    Sensitivity:
+    <input type="range" id="sensitivity" min="1" max="10" value="5">
+  </label>  <script>
+    let running = false;
+    let meterInterval;
+    let audioContext;
+    let analyser;
+    let mic;
+    let isVU = false;
+    let smoothed = 0;
 
-  <div class="presets">
-    <button data-db="40">Quiet Office</button>
-    <button data-db="60">Normal Conversation</button>
-    <button data-db="70">Active Classroom</button>
-    <button data-db="85">Hair Dryer</button>
-    <button data-db="120">Rock Concert</button>
-  </div>
-
-  <div class="meter" id="meter">-- dB</div>
-
-  <script>
     const meter = document.getElementById('meter');
-    const buttons = document.querySelectorAll('.presets button');
-    let referenceDb = 60; // default
+    const vuBar = document.getElementById('vuBar');
+    const vuContainer = document.getElementById('vuBarContainer');
+    const toggleBtn = document.getElementById('toggle');
+    const viewToggleBtn = document.getElementById('viewToggle');
+    const sensitivitySlider = document.getElementById('sensitivity');
 
-    buttons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        buttons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        referenceDb = parseInt(btn.getAttribute('data-db'));
-      });
-    });
+    toggleBtn.onclick = async () => {
+      if (!running) {
+        await startMeter();
+        toggleBtn.textContent = 'Stop';
+        running = true;
+      } else {
+        stopMeter();
+        toggleBtn.textContent = 'Start';
+        running = false;
+      }
+    };
 
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-      const audioCtx = new AudioContext();
-      const analyser = audioCtx.createAnalyser();
-      const mic = audioCtx.createMediaStreamSource(stream);
-      const processor = audioCtx.createScriptProcessor(256, 1, 1);
+    viewToggleBtn.onclick = () => {
+      isVU = !isVU;
+      meter.style.display = isVU ? 'none' : 'flex';
+      vuContainer.style.display = isVU ? 'block' : 'none';
+      viewToggleBtn.textContent = isVU ? 'Switch to Number View' : 'Switch to VU Meter';
+    };
 
-      analyser.fftSize = 256;
+    async function startMeter() {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mic = audioContext.createMediaStreamSource(stream);
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 2048;
+
+      const bufferLength = analyser.fftSize;
+      const dataArray = new Uint8Array(bufferLength);
+
       mic.connect(analyser);
-      analyser.connect(processor);
-      processor.connect(audioCtx.destination);
 
-      processor.onaudioprocess = () => {
-        const data = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(data);
-        let rms = Math.sqrt(data.reduce((a, b) => a + b * b, 0) / data.length);
-        let db = 20 * Math.log10(rms / 255); // rough estimate
-        db = Math.max(-60, db); // clamp low end
-        const relativeDb = Math.round(db + referenceDb);
-        meter.textContent = `${relativeDb} dB`;
-
-        // Visual feedback color
-        if (relativeDb < referenceDb + 5) {
-          meter.style.color = "#4caf50"; // green
-        } else if (relativeDb < referenceDb + 15) {
-          meter.style.color = "#ffc107"; // yellow
-        } else {
-          meter.style.color = "#f44336"; // red
+      meterInterval = setInterval(() => {
+        analyser.getByteTimeDomainData(dataArray);
+        let sumSquares = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          const val = (dataArray[i] - 128) / 128;
+          sumSquares += val * val;
         }
-      };
-    }).catch(err => {
-      meter.textContent = 'Mic access denied';
-      console.error(err);
-    });
-  </script>
-</body>
+        const rms = Math.sqrt(sumSquares / bufferLength);
+        let decibels = 20 * Math.log10(rms);
+
+        const sensitivity = parseInt(sensitivitySlider.value);
+        let normalized = Math.max(0, Math.min(100, Math.round((decibels + 50) * sensitivity)));
+
+        smoothed = smoothed * 0.8 + normalized * 0.2;
+
+        if (isVU) {
+          vuBar.style.width = `${smoothed}%`;
+          if (smoothed < 33) vuBar.style.backgroundColor = 'green';
+          else if (smoothed < 66) vuBar.style.backgroundColor = 'yellow';
+          else vuBar.style.backgroundColor = 'red';
+        } else {
+          meter.textContent = `${Math.round(smoothed)} dB`;
+          meter.style.boxShadow = `0 0 ${smoothed / 2}px rgba(0,255,0,0.4)`;
+        }
+      }, 100);
+    }
+
+    function stopMeter() {
+      clearInterval(meterInterval);
+      audioContext.close();
+      meter.textContent = '0 dB';
+      meter.style.boxShadow = '0 0 30px rgba(0,255,0,0.3)';
+      vuBar.style.width = '0%';
+      vuBar.style.backgroundColor = 'green';
+      smoothed = 0;
+    }
+  </script></body>
 </html>
-
-What it does:
-
-Adds preset buttons with known dB levels.
-
-When a button is clicked, it becomes the reference point.
-
-The meter shows a relative dB value (estimated + reference), so it adapts to environment.
-
-Color changes based on deviation from the reference.
-
-
-Let me know when you’re ready to push this to GitHub. I can walk you through it.
-
