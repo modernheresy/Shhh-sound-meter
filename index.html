@@ -1,87 +1,158 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>shhh: Sound Meter</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shhh! Sound Meter</title>
   <style>
     body {
-      margin: 0;
-      padding: 0;
-      background-color: #111;
-      color: #fff;
       font-family: sans-serif;
       display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
       flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background: #0d0d0d;
+      color: #fff;
     }
-
-    h1 {
-      margin-bottom: 40px;
-      font-size: 1.5em;
-    }
-
-    .circle {
+    #meter {
       width: 200px;
       height: 200px;
       border-radius: 50%;
-      background: radial-gradient(circle at center, #4caf50, #111);
+      background: radial-gradient(circle at center, #2e2e2e, #1a1a1a);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 2em;
-      font-weight: bold;
-      box-shadow: 0 0 30px #4caf50;
-      transition: box-shadow 0.2s, background 0.2s;
+      font-size: 2.5rem;
+      box-shadow: 0 0 30px rgba(0,255,0,0.3);
+      margin: 1.5rem;
+      transition: box-shadow 0.2s ease-in-out;
+    }
+    #vuBarContainer {
+      width: 200px;
+      height: 30px;
+      background: #222;
+      border-radius: 15px;
+      overflow: hidden;
+      display: none;
+    }
+    #vuBar {
+      height: 100%;
+      width: 0%;
+      background-color: green;
+      transition: width 0.3s ease-in-out, background-color 0.3s ease-in-out;
+    }
+    button {
+      padding: 0.6rem 1.2rem;
+      font-size: 1.1rem;
+      cursor: pointer;
+      background: #222;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      margin-top: 0.5rem;
+    }
+    label {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+    }
+    input[type="range"] {
+      width: 200px;
+      margin-top: 0.5rem;
     }
   </style>
 </head>
 <body>
-  <h1>shhh: Sound Meter</h1>
-  <div class="circle" id="meter">-- dB</div>
+  <h1>Shhh! Sound Meter</h1>
+  <div id="meter">0 dB</div>
+  <div id="vuBarContainer"><div id="vuBar"></div></div>
+  <button id="toggle">Start</button>
+  <button id="viewToggle">Switch to VU Meter</button>
+  <label>
+    Sensitivity:
+    <input type="range" id="sensitivity" min="1" max="10" value="5">
+  </label>  <script>
+    let running = false;
+    let meterInterval;
+    let audioContext;
+    let analyser;
+    let mic;
+    let isVU = false;
+    let smoothed = 0;
 
-  <script>
     const meter = document.getElementById('meter');
+    const vuBar = document.getElementById('vuBar');
+    const vuContainer = document.getElementById('vuBarContainer');
+    const toggleBtn = document.getElementById('toggle');
+    const viewToggleBtn = document.getElementById('viewToggle');
+    const sensitivitySlider = document.getElementById('sensitivity');
 
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-      const audioCtx = new AudioContext();
-      const analyser = audioCtx.createAnalyser();
-      const mic = audioCtx.createMediaStreamSource(stream);
-      const processor = audioCtx.createScriptProcessor(256, 1, 1);
+    toggleBtn.onclick = async () => {
+      if (!running) {
+        await startMeter();
+        toggleBtn.textContent = 'Stop';
+        running = true;
+      } else {
+        stopMeter();
+        toggleBtn.textContent = 'Start';
+        running = false;
+      }
+    };
 
-      analyser.fftSize = 256;
+    viewToggleBtn.onclick = () => {
+      isVU = !isVU;
+      meter.style.display = isVU ? 'none' : 'flex';
+      vuContainer.style.display = isVU ? 'block' : 'none';
+      viewToggleBtn.textContent = isVU ? 'Switch to Number View' : 'Switch to VU Meter';
+    };
+
+    async function startMeter() {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mic = audioContext.createMediaStreamSource(stream);
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 2048;
+
+      const bufferLength = analyser.fftSize;
+      const dataArray = new Uint8Array(bufferLength);
+
       mic.connect(analyser);
-      analyser.connect(processor);
-      processor.connect(audioCtx.destination);
 
-      processor.onaudioprocess = () => {
-        const data = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(data);
-        let rms = Math.sqrt(data.reduce((a, b) => a + b * b, 0) / data.length);
-        let db = 20 * Math.log10(rms / 255);
-        db = Math.max(-60, db);
-        db = Math.round(db + 60); // Make it more human-readable
-        meter.textContent = `${db} dB`;
-
-        // color and glow
-        let color;
-        if (db < 55) {
-          color = '#4caf50'; // green
-        } else if (db < 70) {
-          color = '#ffc107'; // yellow
-        } else {
-          color = '#f44336'; // red
+      meterInterval = setInterval(() => {
+        analyser.getByteTimeDomainData(dataArray);
+        let sumSquares = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          const val = (dataArray[i] - 128) / 128;
+          sumSquares += val * val;
         }
+        const rms = Math.sqrt(sumSquares / bufferLength);
+        let decibels = 20 * Math.log10(rms);
 
-        meter.style.background = `radial-gradient(circle at center, ${color}, #111)`;
-        meter.style.boxShadow = `0 0 30px ${color}`;
-      };
-    }).catch(err => {
-      meter.textContent = 'Mic access denied';
-      console.error(err);
-    });
-  </script>
-</body>
+        const sensitivity = parseInt(sensitivitySlider.value);
+        let normalized = Math.max(0, Math.min(100, Math.round((decibels + 50) * sensitivity)));
+
+        smoothed = smoothed * 0.8 + normalized * 0.2;
+
+        if (isVU) {
+          vuBar.style.width = `${smoothed}%`;
+          if (smoothed < 33) vuBar.style.backgroundColor = 'green';
+          else if (smoothed < 66) vuBar.style.backgroundColor = 'yellow';
+          else vuBar.style.backgroundColor = 'red';
+        } else {
+          meter.textContent = `${Math.round(smoothed)} dB`;
+          meter.style.boxShadow = `0 0 ${smoothed / 2}px rgba(0,255,0,0.4)`;
+        }
+      }, 100);
+    }
+
+    function stopMeter() {
+      clearInterval(meterInterval);
+      audioContext.close();
+      meter.textContent = '0 dB';
+      meter.style.boxShadow = '0 0 30px rgba(0,255,0,0.3)';
+      vuBar.style.width = '0%';
+      vuBar.style.backgroundColor = 'green';
+      smoothed = 0;
+    }
+  </script></body>
 </html>
