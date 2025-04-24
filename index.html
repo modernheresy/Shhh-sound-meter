@@ -4,106 +4,97 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Shhh! Sound Meter</title>
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
+    body {
       font-family: sans-serif;
-      background: #0f0f0f;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      text-align: center;
-    }
-    .meter {
-      width: 80vmin;
-      height: 80vmin;
-      border-radius: 50%;
-      background: radial-gradient(circle at center, #1e1e1e 40%, #121212);
-      box-shadow: 0 0 30px rgba(0,255,0,0.3);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background: #111;
+      color: #fff;
     }
-    .db {
+    #meter {
       font-size: 4rem;
-      font-weight: bold;
+      margin: 1rem;
     }
-    .status {
-      margin-top: 1rem;
-      font-size: 1.5rem;
-    }
-    .start {
-      margin-top: 2rem;
-      padding: 0.5rem 2rem;
+    button {
+      padding: 0.5rem 1rem;
       font-size: 1.2rem;
       cursor: pointer;
-      background: #00ff88;
-      color: #000;
-      border: none;
-      border-radius: 8px;
     }
-    .disclaimer {
-      position: absolute;
-      bottom: 1rem;
-      font-size: 0.8rem;
-      color: #aaa;
-      max-width: 300px;
+    label, input {
+      margin-top: 1rem;
+      font-size: 1rem;
+    }
+    input[type="range"] {
+      width: 200px;
     }
   </style>
 </head>
 <body>
-  <div class="meter">
-    <div class="db" id="db">-- dB</div>
-    <div class="status" id="status">Click to start</div>
-    <button class="start" id="startBtn">Start</button>
-  </div>
-  <div class="disclaimer">This sound meter provides approximate values only... Not calibrated for professional or legal use.</div>  <script>
-    let audioContext, analyser, mic, dataArray;
+  <h1>Shhh! Sound Meter</h1>
+  <div id="meter">0 dB</div>
+  <button id="toggle">Start</button>
+  <label>
+    Sensitivity: <input type="range" id="sensitivity" min="1" max="10" value="5">
+  </label>  <script>
     let running = false;
+    let meterInterval;
+    let audioContext;
+    let analyser;
+    let mic;
 
-    const startBtn = document.getElementById('startBtn');
-    const dbDisplay = document.getElementById('db');
-    const status = document.getElementById('status');
+    const meter = document.getElementById('meter');
+    const toggleBtn = document.getElementById('toggle');
+    const sensitivitySlider = document.getElementById('sensitivity');
 
-    startBtn.onclick = async () => {
-      if (running) return;
-      running = true;
-      startBtn.disabled = true;
-      status.textContent = 'Listening...';
+    toggleBtn.onclick = async () => {
+      if (!running) {
+        await startMeter();
+        toggleBtn.textContent = 'Stop';
+        running = true;
+      } else {
+        stopMeter();
+        toggleBtn.textContent = 'Start';
+        running = false;
+      }
+    };
 
+    async function startMeter() {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mic = audioContext.createMediaStreamSource(stream);
       analyser = audioContext.createAnalyser();
-      analyser.fftSize = 512;
-      const bufferLength = analyser.frequencyBinCount;
-      dataArray = new Uint8Array(bufferLength);
+      analyser.fftSize = 2048;
+
+      const bufferLength = analyser.fftSize;
+      const dataArray = new Uint8Array(bufferLength);
 
       mic.connect(analyser);
 
-      const draw = () => {
+      meterInterval = setInterval(() => {
         analyser.getByteTimeDomainData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          let val = (dataArray[i] - 128) / 128;
-          sum += val * val;
+        let sumSquares = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          const val = (dataArray[i] - 128) / 128;
+          sumSquares += val * val;
         }
-        let rms = Math.sqrt(sum / dataArray.length);
-        let db = Math.round(20 * Math.log10(rms));
-        if (db < -60) db = -60;
-        dbDisplay.textContent = `${db} dB`;
+        const rms = Math.sqrt(sumSquares / bufferLength);
+        let decibels = 20 * Math.log10(rms);
 
-        // Change glow color
-        const glow = db < -40 ? '#00ff88' : db < -30 ? '#ffaa00' : '#ff0033';
-        document.querySelector('.meter').style.boxShadow = `0 0 30px ${glow}88`;
+        // Adjust for user sensitivity and normalize
+        const sensitivity = parseInt(sensitivitySlider.value);
+        const normalized = Math.max(0, Math.min(100, Math.round((decibels + 50) * sensitivity)));
+        meter.textContent = `${normalized} dB`;
+      }, 100);
+    }
 
-        requestAnimationFrame(draw);
-      };
-
-      draw();
-    };
+    function stopMeter() {
+      clearInterval(meterInterval);
+      audioContext.close();
+      meter.textContent = '0 dB';
+    }
   </script></body>
 </html>
