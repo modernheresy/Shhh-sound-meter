@@ -28,6 +28,20 @@
       margin: 1.5rem;
       transition: box-shadow 0.2s ease-in-out;
     }
+    #vuBarContainer {
+      width: 200px;
+      height: 30px;
+      background: #222;
+      border-radius: 15px;
+      overflow: hidden;
+      display: none;
+    }
+    #vuBar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(to right, #00ff00, #ffff00, #ff0000);
+      transition: width 0.1s ease-in-out;
+    }
     button {
       padding: 0.6rem 1.2rem;
       font-size: 1.1rem;
@@ -36,6 +50,7 @@
       color: #fff;
       border: none;
       border-radius: 8px;
+      margin-top: 0.5rem;
     }
     label {
       margin-top: 1rem;
@@ -50,7 +65,9 @@
 <body>
   <h1>Shhh! Sound Meter</h1>
   <div id="meter">0 dB</div>
+  <div id="vuBarContainer"><div id="vuBar"></div></div>
   <button id="toggle">Start</button>
+  <button id="viewToggle">Switch to VU Meter</button>
   <label>
     Sensitivity:
     <input type="range" id="sensitivity" min="1" max="10" value="5">
@@ -60,9 +77,13 @@
     let audioContext;
     let analyser;
     let mic;
+    let isVU = false;
 
     const meter = document.getElementById('meter');
+    const vuBar = document.getElementById('vuBar');
+    const vuContainer = document.getElementById('vuBarContainer');
     const toggleBtn = document.getElementById('toggle');
+    const viewToggleBtn = document.getElementById('viewToggle');
     const sensitivitySlider = document.getElementById('sensitivity');
 
     toggleBtn.onclick = async () => {
@@ -75,6 +96,13 @@
         toggleBtn.textContent = 'Start';
         running = false;
       }
+    };
+
+    viewToggleBtn.onclick = () => {
+      isVU = !isVU;
+      meter.style.display = isVU ? 'none' : 'flex';
+      vuContainer.style.display = isVU ? 'block' : 'none';
+      viewToggleBtn.textContent = isVU ? 'Switch to Number View' : 'Switch to VU Meter';
     };
 
     async function startMeter() {
@@ -102,8 +130,12 @@
         const sensitivity = parseInt(sensitivitySlider.value);
         const normalized = Math.max(0, Math.min(100, Math.round((decibels + 50) * sensitivity)));
 
-        meter.textContent = `${normalized} dB`;
-        meter.style.boxShadow = `0 0 ${normalized / 2}px rgba(0,255,0,0.4)`;
+        if (isVU) {
+          vuBar.style.width = `${normalized}%`;
+        } else {
+          meter.textContent = `${normalized} dB`;
+          meter.style.boxShadow = `0 0 ${normalized / 2}px rgba(0,255,0,0.4)`;
+        }
       }, 100);
     }
 
@@ -112,6 +144,7 @@
       audioContext.close();
       meter.textContent = '0 dB';
       meter.style.boxShadow = '0 0 30px rgba(0,255,0,0.3)';
+      vuBar.style.width = '0%';
     }
   </script></body>
 </html>
