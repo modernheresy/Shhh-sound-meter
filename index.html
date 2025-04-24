@@ -40,7 +40,7 @@
       height: 100%;
       width: 0%;
       background-color: green;
-      transition: width 0.1s ease-in-out, background-color 0.2s ease-in-out;
+      transition: width 0.3s ease-in-out, background-color 0.3s ease-in-out;
     }
     button {
       padding: 0.6rem 1.2rem;
@@ -78,6 +78,7 @@
     let analyser;
     let mic;
     let isVU = false;
+    let smoothed = 0;
 
     const meter = document.getElementById('meter');
     const vuBar = document.getElementById('vuBar');
@@ -128,16 +129,18 @@
         let decibels = 20 * Math.log10(rms);
 
         const sensitivity = parseInt(sensitivitySlider.value);
-        const normalized = Math.max(0, Math.min(100, Math.round((decibels + 50) * sensitivity)));
+        let normalized = Math.max(0, Math.min(100, Math.round((decibels + 50) * sensitivity)));
+
+        smoothed = smoothed * 0.8 + normalized * 0.2;
 
         if (isVU) {
-          vuBar.style.width = `${normalized}%`;
-          if (normalized < 33) vuBar.style.backgroundColor = 'green';
-          else if (normalized < 66) vuBar.style.backgroundColor = 'yellow';
+          vuBar.style.width = `${smoothed}%`;
+          if (smoothed < 33) vuBar.style.backgroundColor = 'green';
+          else if (smoothed < 66) vuBar.style.backgroundColor = 'yellow';
           else vuBar.style.backgroundColor = 'red';
         } else {
-          meter.textContent = `${normalized} dB`;
-          meter.style.boxShadow = `0 0 ${normalized / 2}px rgba(0,255,0,0.4)`;
+          meter.textContent = `${Math.round(smoothed)} dB`;
+          meter.style.boxShadow = `0 0 ${smoothed / 2}px rgba(0,255,0,0.4)`;
         }
       }, 100);
     }
@@ -149,6 +152,7 @@
       meter.style.boxShadow = '0 0 30px rgba(0,255,0,0.3)';
       vuBar.style.width = '0%';
       vuBar.style.backgroundColor = 'green';
+      smoothed = 0;
     }
   </script></body>
 </html>
